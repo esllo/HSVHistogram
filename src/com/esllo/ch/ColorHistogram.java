@@ -1,5 +1,7 @@
 package com.esllo.ch;
 
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -19,7 +21,6 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.highgui.Highgui;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.utils.Converters;
 
 public class ColorHistogram {
 
@@ -28,6 +29,7 @@ public class ColorHistogram {
 	}
 
 	JFrame frame;
+	CVDraw draw;
 
 	public ColorHistogram() {
 		initGUI();
@@ -37,9 +39,15 @@ public class ColorHistogram {
 	public void initGUI() {
 		frame = new JFrame("HSV-Histogram");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setLayout(new FlowLayout());
+		draw = new CVDraw();
+		draw.setPreferredSize(new Dimension(400, 300));
+		frame.add(draw);
+		frame.pack();
+		frame.setVisible(true);
 	}
 
-	public BufferedImage openImage() {
+	public static BufferedImage openImage(JFrame frame) {
 		JFileChooser jc = new JFileChooser();
 		if (jc.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
 			File img = jc.getSelectedFile();
@@ -53,7 +61,7 @@ public class ColorHistogram {
 	}
 
 	public void histogram() {
-		Mat image = CV.toMat(openImage());
+		Mat image = CV.toMat(openImage(frame));
 		// Mat src = new Mat(image.height(), image.width(), CvType.CV_8UC2);
 
 		Imgproc.cvtColor(image, image, Imgproc.COLOR_BGR2HSV);
@@ -87,10 +95,17 @@ public class ColorHistogram {
 		Core.normalize(s_hist, s_hist, 3, histImage.rows(), Core.NORM_MINMAX);
 		Core.normalize(v_hist, v_hist, 3, histImage.rows(), Core.NORM_MINMAX);
 
+		float highestV = 0;
+		float highestH = 0;
+
 		for (int i = 1; i < 256; i++) {
 			Point p1 = new Point(bin_w * (i - 1), hist_h - Math.round(h_hist.get(i - 1, 0)[0]));
 			Point p2 = new Point(bin_w * (i), hist_h - Math.round(h_hist.get(i, 0)[0]));
 			Core.line(histImage, p1, p2, new Scalar(255, 0, 0), 2, 8, 0);
+			if (highestV < hist_h - Math.round(h_hist.get(i - 1, 0)[0])) {
+				highestV = hist_h - Math.round(h_hist.get(i - 1, 0)[0]);
+				highestH = i - 1;
+			}
 
 			Point p3 = new Point(bin_w * (i - 1), hist_h - Math.round(s_hist.get(i - 1, 0)[0]));
 			Point p4 = new Point(bin_w * (i), hist_h - Math.round(s_hist.get(i, 0)[0]));
@@ -101,8 +116,12 @@ public class ColorHistogram {
 			Core.line(histImage, p5, p6, new Scalar(0, 0, 255), 2, 8, 0);
 
 		}
-
+		System.out.println(highestH);
+		Mat msk = new Mat(image.size(), CvType.CV_8UC1, new Scalar(255d));
+		Core.inRange(image, new Scalar(highestH - 5, 0, 0), new Scalar(highestH + 5, 255, 255), msk);
+		draw.update(CV.toBufferedImage(msk));
 		Highgui.imwrite("histogram.jpg", histImage);
+		Highgui.imwrite("histogramMsk.jpg", msk);
 	}
 
 }
